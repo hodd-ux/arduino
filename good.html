@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SVG Electronics & Arduino Simulator</title>
+    <style>
+        :root {
+            --bg-dark: #121214;
+            --bg-panel: #1e1e24;
+            --bg-panel-light: #2a2a32;
+            --border-color: #33333d;
+            --accent: #2563eb;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --nav-height: 56px;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Header */
+        header {
+            height: 50px;
+            background: var(--bg-panel);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+            border-bottom: 1px solid var(--border-color);
+            z-index: 20;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 0.95rem;
+            margin: 0;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-badge {
+            font-size: 0.65rem;
+            background: var(--accent);
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .toolbar-btns {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .btn {
+            background: var(--bg-panel-light);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            touch-action: manipulation;
+        }
+
+        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: var(--accent); border-color: var(--accent); }
+        .btn-success { background: var(--accent-green); border-color: var(--accent-green); color: #052e16; }
+        .btn-danger { background: var(--accent-red); border-color: var(--accent-red); }
+
+        /* Main Workspace Layout */
+        #app-layout {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 240px 1fr 380px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Left Sidebar: Components */
+        #toolbox {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .toolbox-header {
+            padding: 12px 14px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .toolbox-list {
+            padding: 10px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .component-card {
+            background: var(--bg-panel-light);
+            border: 1px solid var(--border-color);
+            padding: 10px 12px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .component-card svg {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+            fill: currentColor;
+        }
+
+        .card-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .card-desc {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* Center Canvas */
+        #canvas-container {
+            position: relative;
+            background: #111114;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #workarea {
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(#27272a 1.2px, transparent 1.2px);
+            background-size: 20px 20px;
+            touch-action: none;
+        }
+
+        /* Right Panel: Code & Serial */
+        #right-panel {
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .panel-tab-header {
+            display: flex;
+            background: #16161a;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .panel-tab.active {
+            color: var(--text-main);
+            border-bottom-color: var(--accent);
+            background: var(--bg-panel);
+        }
+
+        .panel-content {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-content.active {
+            display: flex;
+        }
+
+        #editor {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .console {
+            flex: 1;
+            background: #09090b;
+            color: #34d399;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        /* SVG Element Styling */
+        .svg-comp {
+            cursor: move;
+            touch-action: none;
+        }
+
+        .svg-comp.selected rect.comp-body {
+            stroke: #38bdf8 !important;
+            stroke-dasharray: 4 2;
+        }
+
+        .pin-node {
+            cursor: pointer;
+            transition: r 0.1s ease;
+        }
+        .pin-node:hover {
+            r: 7;
+        }
+
+        .circuit-wire {
+            fill: none;
+            stroke: #ef4444;
+            stroke-width: 3;
+            stroke-linecap: round;
+            pointer-events: stroke;
+            cursor: pointer;
+        }
+        .circuit-wire:hover {
+            stroke: #f87171;
+            stroke-width: 4;
+        }
+
+        /* Mobile Bottom Nav Bar */
+        #mobile-nav {
+            display: none;
+            height: var(--nav-height);
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border-color);
+            justify-content: space-around;
+            align-items: center;
+            z-index: 30;
+            flex-shrink: 0;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            background: none;
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+
+        .nav-item.active {
+            color: #38bdf8;
+        }
+
+        /* Responsive Layout Overrides for Phones */
+        @media (max-width: 768px) {
+            #app-layout {
+                display: block;
+                height: calc(100dvh - 50px - var(--nav-height));
+            }
+            #toolbox, #right-panel {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                display: none !important;
+            }
+            #toolbox.mobile-active, #right-panel.mobile-active {
+                display: flex !important;
+            }
+            #canvas-container {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+            #canvas-container.mobile-hidden {
+                display: none;
+            }
+            #mobile-nav {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Electronics & Arduino <span class="header-badge">Sim</span></h1>
+        <div class="toolbar-btns">
+            <button class="btn btn-success" onclick="toggleSimulation()" id="sim-btn">▶ Run</button>
+            <button class="btn btn-danger" onclick="clearCanvas()">Clear</button>
+        </div>
+    </header>
+
+    <div id="app-layout">
+        <!-- Left Sidebar: Components Toolbox -->
+        <div id="toolbox">
+            <div class="toolbox-header">Components Drawer</div>
+            <div class="toolbox-list">
+                <div class="component-card" draggable="true" data-type="arduino">
+                    <svg viewBox="0 0 24 24"><path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1m1 2v14h14V5H5m2 2h2v2H7V7m4 0h2v2h-2V7m4 0h2v2h-2V7M7 11h2v2H7v-2m8 0h2v2h-2v-2m-4 4h2v2h-2v-2z"/></svg>
+                    <div class="card-info">
+                        <span class="card-title">Arduino Uno</span>
+                        <span class="card-desc">ATmega328P Microcontroller</span>
+                    </div>
+                </div>
+                <div class="component-card" draggable="true" data-type="led">
+                    <svg viewBox="0 0 24 24"><path d="M12,2A7,7 0 0,0 5,9C5,11.38 6.19,13.47 8,14.74V17A1,1 0 0,0 9,18H15A1,1 0 0,0 16,17V14.74C17.81,13.47 19,11.38 19,9A7,7 0 0,0 12,2M9,20A1,1 0 0,0 10,21H14A1,1 0 0,0 15,20V19H9V20Z"/></svg>
+                    <div class="card-info">
+                        <span class="card-title">LED Light</span>
+                        <span class="card-desc">Emits light when active</span>
+                    </div>
+                </div>
+                <div class="component-card" draggable="true" data-type="resistor">
+                    <svg viewBox="0 0 24 24"><path d="M2,12H5L6,9L8,15L10,9L12,15L14,9L16,15L18,9L19,12H22" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                    <div class="card-info">
+                        <span class="card-title">Resistor</span>
+                        <span class="card-desc">220Ω Current limiter</span>
+                    </div>
+                </div>
+                <div class="component-card" draggable="true" data-type="battery">
+                    <svg viewBox="0 0 24 24"><path d="M16 4H18V2H6V4H8V6H16V4M6 22H18V8H6V22M9 10H15V12H9V10M9 14H15V16H9V14Z"/></svg>
+                    <div class="card-info">
+                        <span class="card-title">9V Battery</span>
+                        <span class="card-desc">DC Power Source</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Canvas -->
+        <div id="canvas-container">
+            <svg id="workarea"></svg>
+        </div>
+
+        <!-- Right Panel: Code & Serial Console -->
+        <div id="right-panel">
+            <div class="panel-tab-header">
+                <div class="panel-tab active" onclick="switchRightTab('code')">Sketch.ino</div>
+                <div class="panel-tab" onclick="switchRightTab('serial')">Serial Monitor</div>
+            </div>
+            <div class="panel-content active" id="tab-code">
+                <div id="editor">void setup() {
+  pinMode(13, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(13, HIGH);
+  Serial.println("LED ON");
+  delay(1000);
+  digitalWrite(13, LOW);
+  Serial.println("LED OFF");
+  delay(1000);
+}</div>
+            </div>
+            <div class="panel-content" id="tab-serial">
+                <div class="console" id="console">System ready. Connect components to begin.\n</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Navigation Bar -->
+    <div id="mobile-nav">
+        <button class="nav-item active" onclick="switchMobileTab('canvas')">
+            <svg viewBox="0 0 24 24"><path d="M20 3H4C2.89 3 2 3.89 2 5V19C2 20.11 2.89 21 4 21H20C21.11 21 22 20.11 22 19V5C22 3.89 21.11 3 20 3M4 19V5H20V19H4Z"/></svg>
+            Canvas
+        </button>
+        <button class="nav-item" onclick="switchMobileTab('toolbox')">
+            <svg viewBox="0 0 24 24"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M11 17H7V15H11V17M17 13H7V11H17V13M17 9H7V7H17V9Z"/></svg>
+            Parts
+        </button>
+        <button class="nav-item" onclick="switchMobileTab('code')">
+            <svg viewBox="0 0 24 24"><path d="M14.6 16.6L19.2 12L14.6 7.4L16 6L22 12L16 18L14.6 16.6M9.4 16.6L4.8 12L9.4 7.4L8 6L2 12L8 18L9.4 16.6Z"/></svg>
+            Code
+        </button>
+        <button class="nav-item" onclick="switchMobileTab('serial')">
+            <svg viewBox="0 0 24 24"><path d="M20 18C21.1 18 22 17.1 22 16V6C22 4.9 21.1 4 20 4H4C2.9 4 2 4.9 2 6V16C2 17.1 2.9 18 4 18H0V20H24V18H20Z"/></svg>
+            Serial
+        </button>
+    </div>
+
+    <!-- Ace Editor CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <script>
+        // Setup Ace Editor
+        let editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.session.setMode("ace/mode/c_cpp");
+
+        let activePin = null;
+        let isSimulating = false;
+        let simInterval = null;
+        let arduinoState = false;
+
+        // Mobile Tab Switcher
+        function switchMobileTab(tab) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('toolbox').classList.remove('mobile-active');
+            document.getElementById('right-panel').classList.remove('mobile-active');
+            document.getElementById('canvas-container').classList.remove('mobile-hidden');
+
+            if (tab === 'canvas') {
+                event.currentTarget.classList.add('active');
+            } else if (tab === 'toolbox') {
+                event.currentTarget.classList.add('active');
+                document.getElementById('toolbox').classList.add('mobile-active');
+                document.getElementById('canvas-container').classList.add('mobile-hidden');
+            } else if (tab === 'code') {
+                event.currentTarget.classList.add('active');
+                document.getElementById('right-panel').classList.add('mobile-active');
+                document.getElementById('canvas-container').classList.add('mobile-hidden');
+                switchRightTab('code');
+            } else if (tab === 'serial') {
+                event.currentTarget.classList.add('active');
+                document.getElementById('right-panel').classList.add('mobile-active');
+                document.getElementById('canvas-container').classList.add('mobile-hidden');
+                switchRightTab('serial');
+            }
+        }
+
+        function switchRightTab(tabName) {
+            document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel-content').forEach(c => c.classList.remove('active'));
+            if (tabName === 'code') {
+                document.querySelectorAll('.panel-tab')[0].classList.add('active');
+                document.getElementById('tab-code').classList.add('active');
+                editor.resize();
+            } else {
+                document.querySelectorAll('.panel-tab')[1].classList.add('active');
+                document.getElementById('tab-serial').classList.add('active');
+            }
+        }
+
+        // Setup Component Drag & Drop (Mouse + Touch)
+        document.querySelectorAll('.component-card').forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', card.dataset.type);
+            });
+            // Touch support for dragging into canvas
+            card.addEventListener('touchstart', (e) => {
+                const type = card.dataset.type;
+                const touch = e.touches[0];
+                let clone = card.cloneNode(true);
+                clone.style.position = 'fixed';
+                clone.style.left = (touch.clientX - 40) + 'px';
+                clone.style.top = (touch.clientY - 40) + 'px';
+                clone.style.zIndex = '1000';
+                clone.style.opacity = '0.8';
+                document.body.appendChild(clone);
+
+                function onTouchMove(em) {
+                    let t = em.touches[0];
+                    clone.style.left = (t.clientX - 40) + 'px';
+                    clone.style.top = (t.clientY - 40) + 'px';
+                }
+
+                function onTouchEnd(em) {
+                    document.body.removeChild(clone);
+                    let t = em.changedTouches[0];
+                    let canvasRect = document.getElementById('workarea').getBoundingClientRect();
+                    if (t.clientX >= canvasRect.left && t.clientX <= canvasRect.right &&
+                        t.clientY >= canvasRect.top && t.clientY <= canvasRect.bottom) {
+                        createComponentSVG(type, t.clientX - canvasRect.left - 50, t.clientY - canvasRect.top - 50);
+                    }
+                    window.removeEventListener('touchmove', onTouchMove);
+                    window.removeEventListener('touchend', onTouchEnd);
+                }
+
+                window.addEventListener('touchmove', onTouchMove);
+                window.addEventListener('touchend', onTouchEnd);
+            });
+        });
+
+        const canvasContainer = document.getElementById('canvas-container');
+        canvasContainer.addEventListener('dragover', e => e.preventDefault());
+        canvasContainer.addEventListener('drop', e => {
+            e.preventDefault();
+            let type = e.dataTransfer.getData('text/plain');
+            let rect = document.getElementById('workarea').getBoundingClientRect();
+            createComponentSVG(type, e.clientX - rect.left - 50, e.clientY - rect.top - 50);
+        });
+
+        function createComponentSVG(type, x, y) {
+            let svgNS = "http://www.w3.org/2000/svg";
+            let workarea = document.getElementById('workarea');
+            let g = document.createElementNS(svgNS, 'g');
+            g.setAttribute('class', 'svg-comp');
+            g.setAttribute('transform', `translate(${x}, ${y})`);
+
+            let innerHTML = '';
+            if (type === 'arduino') {
+                innerHTML = `
+                    <rect class="comp-body" width="140" height="100" rx="6" fill="#1b4d3e" stroke="#2e7d32" stroke-width="2"/>
+                    <text x="15" y="30" fill="#fff" font-size="12" font-weight="bold">Arduino UNO</text>
+                    <circle class="pin-node" cx="130" cy="20" r="5" fill="#facc15" data-pin="13"/>
+                    <text x="105" y="24" fill="#fff" font-size="9">D13</text>
+                    <circle class="pin-node" cx="130" cy="40" r="5" fill="#facc15" data-pin="GND"/>
+                    <text x="102" y="44" fill="#fff" font-size="9">GND</text>
+                `;
+            } else if (type === 'led') {
+                innerHTML = `
+                    <circle class="comp-body" cx="30" cy="30" r="22" fill="#ef4444" opacity="0.8" stroke="#991b1b" stroke-width="2"/>
+                    <circle class="pin-node" cx="8" cy="30" r="5" fill="#facc15" data-pin="cathode"/>
+                    <circle class="pin-node" cx="52" cy="30" r="5" fill="#facc15" data-pin="anode"/>
+                    <text x="18" y="34" fill="#fff" font-size="10">LED</text>
+                `;
+            } else if (type === 'resistor') {
+                innerHTML = `
+                    <rect class="comp-body" x="10" y="20" width="60" height="20" fill="#e4e4e7" rx="3" stroke="#71717a"/>
+                    <circle class="pin-node" cx="5" cy="30" r="5" fill="#facc15" data-pin="p1"/>
+                    <circle class="pin-node" cx="75" cy="30" r="5" fill="#facc15" data-pin="p2"/>
+                `;
+            } else if (type === 'battery') {
+                innerHTML = `
+                    <rect class="comp-body" x="10" y="10" width="50" height="70" fill="#3f3f46" rx="4" stroke="#71717a"/>
+                    <circle class="pin-node" cx="35" cy="85" r="5" fill="#facc15" data-pin="pos"/>
+                    <text x="25" y="50" fill="#fff" font-size="12">9V</text>
+                `;
+            }
+
+            g.innerHTML = innerHTML;
+            workarea.appendChild(g);
+
+            // Universal Dragging (Mouse & Touch) for placed component
+            let startX, startY;
+            function getCoords(e) {
+                return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+            }
+
+            g.onpointerdown = (e) => {
+                if (e.target.classList.contains('pin-node')) {
+                    handlePinClick(e.target);
+                    return;
+                }
+                let pt = getCoords(e);
+                startX = pt.x;
+                startY = pt.y;
+                g.setPointerCapture(e.pointerId);
+
+                g.onpointermove = (em) => {
+                    let cur = getCoords(em);
+                    let dx = cur.x - startX;
+                    let dy = cur.y - startY;
+                    startX = cur.x;
+                    startY = cur.y;
+                    let matrix = g.transform.baseVal.consolidate()?.matrix || workarea.createSVGMatrix();
+                    g.setAttribute('transform', `translate(${matrix.e + dx}, ${matrix.f + dy})`);
+                };
+
+                g.onpointerup = (em) => {
+                    g.releasePointerCapture(em.pointerId);
+                    g.onpointermove = null;
+                    g.onpointerup = null;
+                };
+            };
+        }
+
+        // Pin Wiring Logic
+        function handlePinClick(pinNode) {
+            let svgNS = "http://www.w3.org/2000/svg";
+            let workarea = document.getElementById('workarea');
+            let rect = pinNode.getBoundingClientRect();
+            let waRect = workarea.getBoundingClientRect();
+            let cx = rect.left + rect.width/2 - waRect.left;
+            let cy = rect.top + rect.height/2 - waRect.top;
+
+            if (!activePin) {
+                activePin = { node: pinNode, x: cx, y: cy };
+                pinNode.setAttribute('fill', '#38bdf8');
+                logToConsole("Pin selected. Tap target pin to wire.");
+            } else {
+                if (activePin.node === pinNode) {
+                    activePin.node.setAttribute('fill', '#facc15');
+                    activePin = null;
+                    return;
+                }
+                // Draw wire
+                let line = document.createElementNS(svgNS, 'path');
+                let d = `M ${activePin.x} ${activePin.y} Q ${(activePin.x + cx)/2} ${(activePin.y + cy)/2 - 30} ${cx} ${cy}`;
+                line.setAttribute('d', d);
+                line.setAttribute('class', 'circuit-wire');
+                line.onclick = () => line.remove();
+                workarea.appendChild(line);
+
+                activePin.node.setAttribute('fill', '#facc15');
+                activePin = null;
+                logToConsole("Wire connected successfully.");
+            }
+        }
+
+        function clearCanvas() {
+            document.getElementById('workarea').innerHTML = '';
+            activePin = null;
+            stopSimulation();
+            logToConsole("Canvas cleared.");
+        }
+
+        function logToConsole(text) {
+            const c = document.getElementById('console');
+            c.innerText += `> ${text}\n`;
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function toggleSimulation() {
+            if (!isSimulating) {
+                startSimulation();
+            } else {
+                stopSimulation();
+            }
+        }
+
+        function startSimulation() {
+            isSimulating = true;
+            document.getElementById('sim-btn').innerText = "⏹ Stop";
+            document.getElementById('sim-btn').className = "btn btn-danger";
+            logToConsole("Simulation started...");
+
+            // Simple loop simulating Arduino D13 blinking
+            simInterval = setInterval(() => {
+                arduinoState = !arduinoState;
+                let ledCircle = document.querySelector('.svg-comp circle[fill="#ef4444"]');
+                if (ledCircle) {
+                    ledCircle.style.opacity = arduinoState ? "1" : "0.3";
+                }
+                logToConsole(`Serial Monitor: LED State: ${arduinoState ? "HIGH" : "LOW"}`);
+            }, 1000);
+        }
+
+        function stopSimulation() {
+            isSimulating = false;
+            clearInterval(simInterval);
+            document.getElementById('sim-btn').innerText = "▶ Run";
+            document.getElementById('sim-btn').className = "btn btn-success";
+            let ledCircle = document.querySelector('.svg-comp circle[fill="#ef4444"]');
+            if (ledCircle) ledCircle.style.opacity = "0.8";
+            logToConsole("Simulation stopped.");
+        }
+    </script>
+</body>
+</html>
