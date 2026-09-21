@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codeforge Pro Chess Engine</title>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chessboard.js & Chess.js dependencies -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        .theme-classic { --bg: #1e293b; --panel: #0f172a; --accent: #3b82f6; }
+        .theme-midnight { --bg: #09090b; --panel: #18181b; --accent: #8b5cf6; }
+        .theme-wood { --bg: #292524; --panel: #1c1917; --accent: #d97706; }
+        body { background-color: var(--bg); color: #f8fafc; }
+        .panel { background-color: var(--panel); }
+        .accent-btn { background-color: var(--accent); }
+    </style>
+</head>
+<body class="theme-classic min-h-screen flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center p-4 border-b border-gray-700 panel">
+        <h1 class="text-xl font-bold tracking-wider flex items-center gap-2">♞ Codeforge Chess AI</h1>
+        <div class="flex gap-4 items-center">
+            <select id="themeSelect" class="bg-gray-800 text-sm px-3 py-1.5 rounded border border-gray-600 focus:outline-none">
+                <option value="theme-classic">Classic Slate</option>
+                <option value="theme-midnight">Midnight Dark</option>
+                <option value="theme-wood">Grandmaster Wood</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        
+        <!-- Left Sidebar: Controls & Levels -->
+        <div class="panel p-5 rounded-xl border border-gray-700 shadow-xl space-y-4">
+            <h2 class="text-lg font-semibold border-b border-gray-700 pb-2">Game Settings</h2>
+            
+            <div>
+                <label class="text-sm text-gray-400 block mb-1">Player Level / Skill</label>
+                <select id="levelSelect" class="w-full bg-gray-800 border border-gray-600 rounded p-2 text-sm">
+                    <option value="1">Beginner (Level 1)</option>
+                    <option value="5">Casual (Level 5)</option>
+                    <option value="10">Intermediate (Level 10)</option>
+                    <option value="15">Advanced (Level 15)</option>
+                    <option value="20" selected>Grandmaster (Level 20)</option>
+                </select>
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+                <span class="text-sm text-gray-400">Learning / Coach Mode</span>
+                <input type="checkbox" id="learningMode" class="w-5 h-5 accent-blue-500 cursor-pointer">
+            </div>
+
+            <div class="pt-4 flex gap-2">
+                <button id="newGameBtn" class="flex-1 accent-btn text-white py-2 rounded font-medium transition hover:opacity-90">New Game</button>
+                <button id="undoBtn" class="px-4 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition">Undo</button>
+            </div>
+
+            <div id="evalBarContainer" class="pt-4">
+                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                    <span>Evaluation</span>
+                    <span id="evalText">Equal</span>
+                </div>
+                <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden flex">
+                    <div id="evalBar" class="bg-blue-500 h-full w-1/2 transition-all duration-300"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: The Chessboard -->
+        <div class="flex justify-center items-center">
+            <div id="board" class="w-full max-w-[450px] shadow-2xl rounded-lg overflow-hidden border-4 border-gray-700"></div>
+        </div>
+
+        <!-- Right Sidebar: Engine Thoughts & Coaching -->
+        <div class="panel p-5 rounded-xl border border-gray-700 shadow-xl flex flex-col h-[500px]">
+            <h2 class="text-lg font-semibold border-b border-gray-700 pb-2 mb-3">Coach & Engine Console</h2>
+            
+            <div id="consoleLog" class="flex-1 bg-gray-950 rounded p-3 font-mono text-xs overflow-y-auto space-y-2 border border-gray-800 text-gray-300">
+                <p class="text-blue-400">[System]: Engine initialized. Ready for match.</p>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-gray-700">
+                <button id="hintBtn" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 py-2 rounded text-sm transition">Get Hint / Coach Advice</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center p-3 text-xs text-gray-500 border-t border-gray-800 panel">
+        Powered by Stockfish Engine & Chess.js
+    ></footer>
+
+    <!-- Application Script -->
+    <script>
+        let board = null;
+        let game = new Chess();
+        let stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
+        let isEngineThinking = false;
+
+        // UI Logging Helper
+        function logConsole(message, type = 'info') {
+            const consoleLog = $('#consoleLog');
+            let color = 'text-gray-300';
+            if (type === 'engine') color = 'text-green-400';
+            if (type === 'coach') color = 'text-yellow-400';
+            if (type === 'error') color = 'text-red-400';
+            
+            consoleLog.append(`<p class="${color}">[${type.toUpperCase()}] ${message}</p>`);
+            consoleLog.scrollTop(consoleLog[0].scrollHeight);
+        }
+
+        // Initialize Stockfish UCI
+        stockfish.postMessage('uci');
+        stockfish.onmessage = function(event) {
+            let line = event.data;
+            
+            if (line.includes('bestmove')) {
+                isEngineThinking = false;
+                let bestMove = line.split(' ')[1];
+                if (bestMove) {
+                    game.move({
+                        from: bestMove.substring(0, 2),
+                        to: bestMove.substring(2, 4),
+                        promotion: bestMove.substring(4, 5) || 'q'
+                    });
+                    board.position(game.fen());
+                    logConsole(`Played: ${bestMove}`, 'engine');
+                    checkGameEnd();
+                }
+            }
+            
+            // Parse Evaluation for UI bar
+            if (line.includes('info') && line.includes('score')) {
+                let match = line.match(/score (cp|mate) (-?\d+)/);
+                if (match) {
+                    let scoreType = match[1];
+                    let val = parseInt(match[2]);
+                    let displayText = "";
+                    
+                    if (scoreType === 'cp') {
+                        let evalFloat = val / 100;
+                        displayText = `Evaluation: ${evalFloat > 0 ? '+' + evalFloat : evalFloat}`;
+                        let percent = 50 + (evalFloat * 10); // Simple scaling
+                        $('#evalBar').css('width', Math.min(Math.max(percent, 5), 95) + '%');
+                    } else {
+                        displayText = `Mate in ${val}`;
+                    }
+                    $('#evalText').text(displayText);
+                }
+            }
+        };
+
+        // Chessboard integration logic
+        function onDragStart (source, piece, position, orientation) {
+            if (game.game_over() || isEngineThinking) return false;
+            // Only allow picking up user pieces (Default White)
+            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+                (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+                return false;
+            }
+        }
+
+        function onDrop (source, target) {
+            // See if move is legal
+            let move = game.move({
+                from: source,
+                to: target,
+                promotion: 'always' // NOTE: always promote to a queen for simplicity
+            });
+
+            if (move === null) return 'snapback';
+
+            logConsole(`Player move: ${source}-${target}`);
+            checkGameEnd();
+
+            // Trigger Learning Mode explanation if active
+            if ($('#learningMode').is(':checked')) {
+                provideCoaching(move);
+            }
+
+            // Trigger Engine response
+            if (!game.game_over()) {
+                triggerEngineMove();
+            }
+        }
+
+        function onSnapEnd () {
+            board.position(game.fen());
+        }
+
+        function triggerEngineMove() {
+            isEngineThinking = true;
+            let level = $('#levelSelect').val();
+            // Map level (1-20) to Stockfish skill level (0-20) and depth
+            let skillLevel = Math.floor((level / 20) * 20);
+            let depth = Math.max(1, Math.floor((level / 20) * 15));
+
+            stockfish.postMessage(`setoption name Skill Level value ${skillLevel}`);
+            stockfish.postMessage(`position fen ${game.fen()}`);
+            stockfish.postMessage(`go depth ${depth}`);
+            logConsole(`Thinking (Level ${level}, Depth ${depth})...`, 'engine');
+        }
+
+        function checkGameEnd() {
+            if (game.in_checkmate()) {
+                logConsole("Checkmate! Game Over.", 'error');
+                alert("Checkmate! Game Over.");
+            } else if (game.in_draw()) {
+                logConsole("Game drawn.", 'error');
+                alert("Game Drawn!");
+            } else if (game.in_check()) {
+                logConsole("Check!", 'coach');
+            }
+        }
+
+        function provideCoaching(move) {
+            // Basic pedagogical hints based on standard principles
+            let advice = "Good move developing your pieces or controlling space.";
+            if (move.captured) {
+                advice = `Excellent tactical exchange capturing the opponent's ${move.captured.toUpperCase()}.`;
+            } else if (move.san.includes('O-O')) {
+                advice = "Good job castling! King safety is a core chess milestone.";
+            } else if (move.piece === 'p' && (move.to[1] === '4' || move.to[1] === '5')) {
+                advice = "Controlling the center with pawns is key to opening up lines.";
+            }
+            logConsole(`Coach: ${advice}`, 'coach');
+        }
+
+        // Setup Board configuration
+        let config = {
+            draggable: true,
+            position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            onSnapEnd: onSnapEnd,
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+        };
+        board = ChessBoard('board', config);
+
+        // UI Event Listeners
+        $('#newGameBtn').click(() => {
+            game.reset();
+            board.start();
+            logConsole("New game started.", 'info');
+            $('#evalBar').css('width', '50%');
+            $('#evalText').text('Equal');
+        });
+
+        $('#undoBtn').click(() => {
+            game.undo();
+            game.undo(); // Undo both engine and player move
+            board.position(game.fen());
+            logConsole("Last turn undone.", 'info');
+        });
+
+        $('#themeSelect').change(function() {
+            $('body').removeClass('theme-classic theme-midnight theme-wood').addClass($(this).val());
+        });
+
+        $('#hintBtn').click(() => {
+            if (isEngineThinking) return;
+            logConsole("Analyzing best continuation for hint...", 'coach');
+            stockfish.postMessage(`position fen ${game.fen()}`);
+            stockfish.postMessage(`go depth 10`);
+        });
+
+        $(window).resize(() => board.resize());
+    </script>
+</body>
+</html>
