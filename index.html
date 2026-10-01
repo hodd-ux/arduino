@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MT7 - Global Financial & Asset Trading</title>
+    <link rel="stylesheet" href="mt7.css">
+</head>
+<body>
+
+    <header>
+        <div class="stats-bar">
+            <div class="stat-item" id="card-stat-capital">
+                <span class="stat-label">Capital</span>
+                <span class="stat-value money" id="stat-money">$10,000</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Net/Sec</span>
+                <span class="stat-value money" id="stat-income">$0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Active Debt</span>
+                <span class="stat-value debt" id="stat-debt">$0</span>
+            </div>
+            <div class="stat-item" id="card-stat-pnl">
+                <span class="stat-label">Trade P&L</span>
+                <span class="stat-value" id="stat-pnl">$0</span>
+            </div>
+        </div>
+        <nav>
+            <button class="nav-btn active" onclick="switchView('sim', event)">MT7 Feed</button>
+            <button class="nav-btn" onclick="switchView('market', event)">Market</button>
+            <button class="nav-btn" onclick="switchView('portfolio', event)">Portfolio</button>
+            <button class="nav-btn" onclick="switchView('banks', event)">Loans</button>
+            <button class="nav-btn" onclick="switchView('dashboard', event)">Stats</button>
+            <button class="nav-btn" onclick="switchView('deposit', event)">Deposit</button>
+            <button class="nav-btn" onclick="switchView('withdraw', event)">Withdraw</button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- MT7 BLOG VIEW -->
+        <div id="sim-view" class="view active">
+            <div class="blog-container" id="blog-container"></div>
+        </div>
+
+        <!-- MARKET VIEW -->
+        <div id="market-view" class="view">
+            <div style="font-size: 0.8rem; color: var(--text-dim);">Acquire corporate assets or buy back shares from public markets.</div>
+            <div class="grid" id="market-grid"></div>
+        </div>
+
+        <!-- PORTFOLIO VIEW -->
+        <div id="portfolio-view" class="view">
+            <div style="font-size: 0.8rem; color: var(--text-dim);">Manage assets, issue stock shares, or liquidate whole properties.</div>
+            <div class="grid" id="portfolio-grid"></div>
+        </div>
+
+        <!-- BANKS VIEW -->
+        <div id="banks-view" class="view">
+            <div style="font-size: 0.8rem; color: var(--text-dim);">Trusted financial institutions offering corporate debt (Interest calculated per minute).</div>
+            <div class="grid" id="bank-grid"></div>
+        </div>
+
+        <!-- DEPOSIT VIEW -->
+        <div id="deposit-view" class="view">
+            <div class="panel">
+                <div class="funding-header">
+                    <div>
+                        <h3 class="funding-title">Deposit</h3>
+                        <div class="funding-note">Fund your MT7 account through the Node.js funding API.</div>
+                    </div>
+                    <span class="funding-badge">API</span>
+                </div>
+                <div class="funding-grid">
+                    <div class="funding-card">
+                        <label class="form-label" for="deposit-amount">Amount</label>
+                        <input class="form-input" id="deposit-amount" type="number" min="1" step="0.01" placeholder="1000">
+                        <label class="form-label" for="deposit-method">Method</label>
+                        <select class="form-select" id="deposit-method"></select>
+                        <label class="form-label" for="deposit-reference">Reference / phone / account</label>
+                        <input class="form-input" id="deposit-reference" type="text" maxlength="100" placeholder="Optional">
+                        <div id="deposit-error" class="funding-error"></div>
+                        <button class="btn" onclick="submitFunding('deposit')">Deposit</button>
+                    </div>
+                    <div class="funding-card">
+                        <div class="card-header"><span class="card-title">Deposit status</span><span id="deposit-balance" class="metric-val">$0</span></div>
+                        <div class="funding-note" id="deposit-api-status">Loading funding API…</div>
+                        <div class="tx-list" id="deposit-transactions"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WITHDRAW VIEW -->
+        <div id="withdraw-view" class="view">
+            <div class="panel">
+                <div class="funding-header">
+                    <div>
+                        <h3 class="funding-title">Withdraw</h3>
+                        <div class="funding-note">Request a withdrawal through the Node.js funding API.</div>
+                    </div>
+                    <span class="funding-badge">API</span>
+                </div>
+                <div class="funding-grid">
+                    <div class="funding-card">
+                        <label class="form-label" for="withdraw-amount">Amount</label>
+                        <input class="form-input" id="withdraw-amount" type="number" min="1" step="0.01" placeholder="500">
+                        <label class="form-label" for="withdraw-method">Method</label>
+                        <select class="form-select" id="withdraw-method"></select>
+                        <label class="form-label" for="withdraw-destination">Destination / account</label>
+                        <input class="form-input" id="withdraw-destination" type="text" maxlength="100" placeholder="Account or phone">
+                        <div id="withdraw-error" class="funding-error"></div>
+                        <button class="btn danger" onclick="submitFunding('withdraw')">Withdraw</button>
+                    </div>
+                    <div class="funding-card">
+                        <div class="card-header"><span class="card-title">Withdrawal status</span><span id="withdraw-balance" class="metric-val">$0</span></div>
+                        <div class="funding-note" id="withdraw-api-status">Loading funding API…</div>
+                        <div class="tx-list" id="withdraw-transactions"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboard-view" class="view">
+            <div class="panel">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Capital Growth Analytics</h3>
+                    <div class="chart-controls">
+                        <button class="chart-btn" onclick="zoomChart('dashboard', 1.2)">Zoom +</button>
+                        <button class="chart-btn" onclick="zoomChart('dashboard', 0.8)">Zoom -</button>
+                        <button class="chart-btn" onclick="resetZoom('dashboard')">Reset</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-axes" id="dashboard-axes">
+                        <span id="dash-max">10K</span>
+                        <span id="dash-mid">5K</span>
+                        <span id="dash-min">0</span>
+                    </div>
+                    <div class="chart-svg-wrap" id="dash-wrap">
+                        <div class="chart-tooltip" id="dash-tooltip"></div>
+                        <svg id="chart-svg" width="100%" height="100%" viewBox="0 0 500 300" preserveAspectRatio="none">
+                            <g id="dashboard-candles"></g>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>System Transaction Ledger</h3>
+                    <button class="btn danger" style="flex:0; padding:0.2rem 0.50rem; font-size:0.6rem;" onclick="resetSave()">Reset Game</button>
+                </div>
+                <div class="log-box" id="log-box">
+                    <div class="log-entry market">System Online. Initial capital secured: $10,000.</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ASSET GRAPH MODAL -->
+    <div class="modal-overlay" id="asset-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title" id="modal-asset-name">Asset Trading</span>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="card-desc" id="modal-asset-desc">Real-time valuation and price fluctuations.</div>
+            <div style="display:flex; justify-content:flex-end; gap:0.3rem;">
+                <button class="chart-btn" onclick="zoomChart('modal', 1.2)">Zoom +</button>
+                <button class="chart-btn" onclick="zoomChart('modal', 0.8)">Zoom -</button>
+                <button class="chart-btn" onclick="resetZoom('modal')">Reset</button>
+            </div>
+            <div class="chart-container">
+                <div class="chart-axes" id="modal-axes">
+                    <span id="modal-max">0</span>
+                    <span id="modal-mid">0</span>
+                    <span id="modal-min">0</span>
+                </div>
+                <div class="chart-svg-wrap" id="modal-wrap">
+                    <div class="chart-tooltip" id="modal-tooltip"></div>
+                    <!-- HTML Pop-up attached to graph action -->
+                    <div class="graph-popup" id="graph-popup"></div>
+                    <svg id="modal-chart-svg" width="100%" height="100%" viewBox="0 0 500 300" preserveAspectRatio="none">
+                        <g id="modal-candles"></g>
+                    </svg>
+                </div>
+            </div>
+            <div class="card-metrics">
+                <div>Current Price: <span class="metric-val" id="modal-asset-price">$0</span></div>
+                <div>Owned Shares: <span class="metric-val" id="modal-asset-owned">0</span></div>
+                <div>Yield: <span class="metric-val" id="modal-asset-yield">+$0/s</span></div>
+            </div>
+
+            <!-- Trading Configuration Panel (Fixed Time & Luck Outcome) -->
+            <div class="trade-config-box">
+                <div class="trade-config-row">
+                    <span>Investment Amount ($):</span>
+                    <input type="number" id="trade-inv-amt" class="trade-input" value="1000" min="10" />
+                </div>
+                <div class="trade-config-row">
+                    <span>Fixed Trade Time (sec):</span>
+                    <input type="number" id="trade-time-sec" class="trade-input" value="10" min="3" max="120" />
+                </div>
+            </div>
+
+            <!-- Active Timed Trades Preview -->
+            <div class="active-trades-container" id="active-trades-container"></div>
+
+            <div class="card-actions">
+                <button class="btn" id="modal-buy-btn" onclick="executeTimedTrade('BUY')">Buy (Bullish)</button>
+                <button class="btn danger" id="modal-sell-btn" onclick="executeTimedTrade('SELL')">Sell (Bearish)</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="mt7.js" defer></script>
+<script>window.MT7_API_BASE = window.MT7_API_BASE || "/api/mt7";</script>
+</body>
+</html>
